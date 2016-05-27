@@ -2021,16 +2021,13 @@ def Z_Entropy(q_Z, M, J):
 
 eps_FreeEnergy = 0.0000000001
 
-
 def RL_Entropy(Sigma_RL, M, J):
-    #logger.info('Computing RLs Entropy ...')
-    Det_Sigma_RL_j = np.zeros(J, dtype=np.float64)
-    Const = (2 * np.pi * np.exp(1)) ** M
     Entropy = 0.0
+    Const = (2 * np.pi * np.exp(1)) ** M
     for j in xrange(0, J):
-        Det_Sigma_RL_j = np.linalg.det(Sigma_RL[:, :, j])
-        Entropy_j = np.sqrt(Const * Det_Sigma_RL_j)
-        Entropy += np.log(Entropy_j)
+        if not Sigma_RL.sum()==0:
+            _, log_Det_Sigma_RL_j = np.linalg.slogdet(Sigma_RL[:, :, j])
+            Entropy += (np.log(Const) + log_Det_Sigma_RL_j) /2
     return Entropy
 
 
@@ -2063,25 +2060,22 @@ def RL_expectation_Ptilde(m_X, Sigma_X, mu_Mx, sigma_Mx, q_Z):
 
 def RF_expectation_Ptilde(m_X, Sigma_X, sigmaX, R, R_inv, D):
     #logger.info('Computing RF expectation Ptilde ...')
-    _, logdetR = np.linalg.slogdet(R)
-    const = D * np.log(2 * np.pi) + logdetR
-    S = (np.dot(np.dot(m_X.T, R_inv), m_X) + np.dot(Sigma_X, R_inv).trace()) / sigmaX \
-        + D * np.log(sigmaX)
+    const = D * np.log(2 * np.pi) + np.linalg.slogdet(R)[1] + D * np.log(sigmaX)
+    S = (np.dot(np.dot(m_X.T, R_inv), m_X) + np.dot(Sigma_X, R_inv).trace()) / sigmaX
     return - (const + S) / 2.
 
 
 def Q_expectation_Ptilde(q_Z, neighboursIndexes, Beta, gamma, K, M):
-    #Qtilde = np.concatenate((q_Z, np.zeros((M, K, 1), dtype=q_Z.dtype)), axis=2)
-    Qtilde_sumneighbour = q_Z[:, :, neighboursIndexes].sum(axis=3) # (M, K, J)
+    Qtilde = np.concatenate((q_Z, np.zeros((M, K, 1), dtype=q_Z.dtype)), axis=2)
+    Qtilde_sumneighbour = Qtilde[:, :, neighboursIndexes].sum(axis=3) # (M, K, J)
     beta_Qtilde_sumneighbour = Beta[:, np.newaxis, np.newaxis] * Qtilde_sumneighbour
 
     # Mean field approximation
     E = np.exp(beta_Qtilde_sumneighbour - beta_Qtilde_sumneighbour.max(axis=0)) # (K, J)
-    aux = E.sum(axis=0)
-    aux[np.where(aux==0)] = eps
-    p_Q_MF = E / aux
+    p_Q_MF = E / E.sum(axis=0)
 
     # sum_neighbours p_Q_MF(neighbour) according to new beta
+    #p_Q_MF_sumneighbour = np.concatenate((p_Q_MF, np.zeros((M, K, 1), dtype=p_Q_MF.dtype)), axis=2)
     p_Q_MF_sumneighbour = p_Q_MF[:, :, neighboursIndexes].sum(axis=3)  # (M, K, J)
 
     return - np.log(np.exp(beta_Qtilde_sumneighbour).sum(axis=1)).sum() \
@@ -2098,7 +2092,7 @@ def expectation_Ptilde_Likelihood(y_tilde, m_A, Sigma_A, H, Sigma_H, m_C,
                                            G, Sigma_H, Sigma_G, W, y_tilde, Gamma, \
                                            Gamma_X, Gamma_WX, N)
     return  - (N * J * np.log(2 * np.pi) - J * np.log(np.linalg.det(Gamma)) \
-            + N * np.log(sigma_eps).sum() + N * (sigma_eps_1 / sigma_eps).sum()) / 2.
+            + N * np.log(np.abs(sigma_eps)).sum() + N * (sigma_eps_1 / sigma_eps).sum()) / 2.
 
 
 def Compute_FreeEnergy(y_tilde, m_A, Sigma_A, mu_Ma, sigma_Ma, m_H, Sigma_H, AuxH,
@@ -2124,6 +2118,7 @@ def Compute_FreeEnergy(y_tilde, m_A, Sigma_A, mu_Ma, sigma_Ma, m_H, Sigma_H, Aux
     EPtildeG = RF_expectation_Ptilde(AuxG, Sigma_G, sigmaG, R, R_inv, D)
     EPtildeQ = Q_expectation_Ptilde(q_Z, neighboursIndexes, Beta, gamma, K, M)
     EPtildeBeta = M * np.log(gamma) - gamma * Beta.sum()
+
     if hyp:
         EPtildeVh = np.log(gamma_h) - gamma_h * sigmaH
         EPtildeVg = np.log(gamma_g) - gamma_g * sigmaG
@@ -2153,6 +2148,7 @@ def Compute_FreeEnergy(y_tilde, m_A, Sigma_A, mu_Ma, sigma_Ma, m_H, Sigma_H, Aux
             print 'EPtC = ', EPtildeC, 'EPtG = ', EPtildeG, 'EPtVg = ', EPtildeVg
 
     return EPtilde + Total_Entropy
+
 
 
 
@@ -2209,9 +2205,7 @@ def expectation_ptilde_hrf(hrf_mean, hrf_covar, sigma_h, hrf_regu_prior,
              + np.linalg.slogdet(hrf_regu_prior)[1])
     s = -(np.dot(np.dot(hrf_mean.T, hrf_regu_prior_inv), hrf_mean)
          + np.dot(hrf_covar, hrf_regu_prior_inv).trace()) / sigma_h
-
     return (const + s) / 2.
-
 
 def expectation_ptilde_labels(labels_proba, neighbours_indexes, beta,
                               nb_conditions, nb_classes):
@@ -2272,23 +2266,13 @@ def free_energy_computation(nrls_mean, nrls_covar, hrf_mean, hrf_covar, hrf_len,
         + expectation_ptilde_hrf(hrf_mean, hrf_covar, sigma_h, hrf_regu_prior,
                                  hrf_regu_prior_inv, hrf_len)
     )
-    print 'entropy A =', nrls_entropy(nrls_covar, nb_conditions)
-    print 'entropy H =', hrf_entropy(hrf_covar, hrf_len)
-    print 'entropy Z =', labels_entropy(labels_proba)
-    print 'total entropy =', total_entropy
-    print 'exp Lklh =', expectation_ptilde_likelihood(data_drift, nrls_mean, nrls_covar, hrf_mean, hrf_covar, occurence_matrix,
-        noise_var, noise_struct, nb_voxels, nb_scans)
-    print 'exp A =', expectation_ptilde_nrls(labels_proba, nrls_class_mean, nrls_class_var, nrls_mean, nrls_covar)
-    print 'exp Z =', expectation_ptilde_labels(labels_proba, neighbours_indexes, beta, nb_conditions, nb_classes)
-    print 'exp H =', expectation_ptilde_hrf(hrf_mean, hrf_covar, sigma_h, hrf_regu_prior, hrf_regu_prior_inv, hrf_len)
-    print 'total expectation =', total_expectation
 
     total_prior = 0
     if gamma:
         total_prior += nb_conditions*np.log(gamma) - gamma*beta.sum()
     if hrf_hyperprior:
         total_prior += log(hrf_hyperprior) - hrf_hyperprior*sigma_h
-    print 'prior gamma and hyp =', total_prior
+
     return total_expectation + total_entropy + total_prior
 
 
