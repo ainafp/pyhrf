@@ -350,6 +350,42 @@ def create_conditions(onsets, durations, nb_conditions, nb_scans, hrf_len, tr, d
     return X, occurence_matrix, condition_names
 
 
+def create_conditions_ms(onsets, durations, nb_conditions, nb_scans, hrf_len, S, tr, dt):
+    """Generate the occurences matrix
+
+    Parameters
+    ----------
+    onsets : dict
+        dictionary of onsets
+    durations : dict
+        # TODO
+    nb_conditions : int
+    nb_scans : int
+    hrf_len : int
+    tr : float
+    dt : float
+
+    Returns
+    -------
+    X : dict
+        dictionary of the occurence matrix
+    occurence_matrix : ndarray
+    condition_names : list
+    """
+    condition_names = []
+    X = OrderedDict([])
+    occurence_matrix = np.zeros((S, nb_conditions, nb_scans, hrf_len), dtype=np.int32)
+    nc = 0
+    for condition, onset in onsets.iteritems():
+        duration = np.asarray(durations[condition])
+        for s in xrange(S):
+            X[condition] = compute_mat_X_2(nb_scans, tr, hrf_len, dt, onset[s, :], durations=duration[s, :])
+            occurence_matrix[s, nc, :, :] = X[condition]
+        condition_names.append(condition)
+        nc += 1
+    return X, occurence_matrix, condition_names
+
+
 def create_neighbours(graph):
     """Transforms the graph list in ndarray. This is for performances purposes.
     Sets the empty neighbours to -1.
@@ -2236,13 +2272,23 @@ def free_energy_computation(nrls_mean, nrls_covar, hrf_mean, hrf_covar, hrf_len,
         + expectation_ptilde_hrf(hrf_mean, hrf_covar, sigma_h, hrf_regu_prior,
                                  hrf_regu_prior_inv, hrf_len)
     )
+    print 'entropy A =', nrls_entropy(nrls_covar, nb_conditions)
+    print 'entropy H =', hrf_entropy(hrf_covar, hrf_len)
+    print 'entropy Z =', labels_entropy(labels_proba)
+    print 'total entropy =', total_entropy
+    print 'exp Lklh =', expectation_ptilde_likelihood(data_drift, nrls_mean, nrls_covar, hrf_mean, hrf_covar, occurence_matrix,
+        noise_var, noise_struct, nb_voxels, nb_scans)
+    print 'exp A =', expectation_ptilde_nrls(labels_proba, nrls_class_mean, nrls_class_var, nrls_mean, nrls_covar)
+    print 'exp Z =', expectation_ptilde_labels(labels_proba, neighbours_indexes, beta, nb_conditions, nb_classes)
+    print 'exp H =', expectation_ptilde_hrf(hrf_mean, hrf_covar, sigma_h, hrf_regu_prior, hrf_regu_prior_inv, hrf_len)
+    print 'total expectation =', total_expectation
 
     total_prior = 0
     if gamma:
         total_prior += nb_conditions*np.log(gamma) - gamma*beta.sum()
     if hrf_hyperprior:
         total_prior += log(hrf_hyperprior) - hrf_hyperprior*sigma_h
-
+    print 'prior gamma and hyp =', total_prior
     return total_expectation + total_entropy + total_prior
 
 

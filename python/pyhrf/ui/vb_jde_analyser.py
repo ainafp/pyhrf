@@ -10,7 +10,7 @@ import nibabel
 
 from pyhrf.ndarray import xndarray
 from pyhrf.vbjde.vem_tools import roc_curve
-from pyhrf.vbjde.vem_bold import jde_vem_bold
+from pyhrf.vbjde.vem_bold_plots import jde_vem_bold
 from pyhrf.vbjde.vem_bold_constrained import  Main_vbjde_Python_constrained
 from pyhrf.xmlio import XmlInitable
 from pyhrf.tools import format_duration
