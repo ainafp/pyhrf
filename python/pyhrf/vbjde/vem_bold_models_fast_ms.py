@@ -251,11 +251,10 @@ def Main_vbjde_physio(graph, Y, Onsets, durations, Thrf, K, TR, beta, dt,
         # A
         if estimateA:
             logger.info("E A step ...")
-            #m_A, Sigma_A = vt.expectation_A_ms(m_A, Sigma_A, H, G, m_C, W, XX, Gamma, Gamma_X, q_Z, mu_Ma, sigma_Ma, J, y_tilde, Sigma_H, sigma_eps_m, N, M, D, n_sess)
-            m_A, Sigma_A = vt.nrls_expectation(
-            H, m_A[0, :, :], XX[s, :, :, :], Gamma, q_Z, mu_Ma, sigma_Ma, M, y_tilde[s, :, :], Sigma_A[:, :, :, 0], Sigma_H, sigma_eps[s, :])
-            m_A = m_A[np.newaxis, ...]
-            Sigma_A = Sigma_A[..., np.newaxis]
+            m_A, Sigma_A = vt.expectation_A_ms(m_A, Sigma_A, H, G, m_C, W, XX, Gamma, Gamma_X, q_Z, mu_Ma, sigma_Ma, J, y_tilde, Sigma_H, sigma_eps_m, N, M, D, n_sess)
+            #m_A, Sigma_A = vt.nrls_expectation(H, m_A[0, :, :], XX[s, :, :, :], Gamma, q_Z, mu_Ma, sigma_Ma, M, y_tilde[s, :, :], Sigma_A[:, :, :, 0], Sigma_H, sigma_eps[s, :])
+            #m_A = m_A[np.newaxis, ...]
+            #Sigma_A = Sigma_A[..., np.newaxis]
 
             cA += [(np.linalg.norm(m_A - m_A1) / np.linalg.norm(m_A1)) ** 2]
             m_A1[:, :, :] = m_A[:, :, :]
@@ -291,8 +290,8 @@ def Main_vbjde_physio(graph, Y, Onsets, durations, Thrf, K, TR, beta, dt,
         # HRF H
         if estimateH:
             logger.info("E H step ...")
-            #Ht, Sigma_H = vt.expectation_H_ms(Sigma_A, m_A, m_C, G, XX, W, Gamma, Gamma_X, X_Gamma_X, J, y_tilde, cov_noise, matrix_covH, sigmaH, priorH_mean_term, priorH_cov_term, N, M, D, n_sess)
-            Ht, Sigma_H = vt.hrf_expectation(Sigma_A[:, :, :, s], m_A[s, :, :], XX[s, :, :, :], Gamma, R_inv, sigmaH, J, y_tilde[s, :, :], sigma_eps[s, :])
+            Ht, Sigma_H = vt.expectation_H_ms(Sigma_A, m_A, m_C, G, XX, W, Gamma, Gamma_X, X_Gamma_X, J, y_tilde, cov_noise, matrix_covH, sigmaH, priorH_mean_term, priorH_cov_term, N, M, D, n_sess)
+            #Ht, Sigma_H = vt.hrf_expectation(Sigma_A[:, :, :, s], m_A[s, :, :], XX[s, :, :, :], Gamma, R_inv, sigmaH, J, y_tilde[s, :, :], sigma_eps[s, :])
             if constraint:
                 if not np.linalg.norm(Ht)==1:
                     logger.info("   constraint l2-norm = 1")
