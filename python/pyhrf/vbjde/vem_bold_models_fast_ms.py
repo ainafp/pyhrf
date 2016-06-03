@@ -220,8 +220,7 @@ def Main_vbjde_physio(graph, Y, Onsets, durations, Thrf, K, TR, beta, dt,
 
     #while ((ni < NitMin + 1) or (((Crit_AH > Thresh) or (Crit_CG > Thresh)) and (ni < NitMax))):
     #while ((ni < NitMin + 1) or (((Crit_AH > Thresh)) and (ni < NitMax))):
-    while ((ni < NitMin + 1) or (((Crit_FE > Thresh * np.ones_like(Crit_FE)).any()) \
-            and (ni < NitMax))):
+    while ((ni < NitMin + 1) or (((Crit_FE > Thresh * np.ones_like(Crit_FE)).any()) and (ni < NitMax))):
 
         logger.info("-------- Iteration n° " + str(ni + 1) + " --------")
 
@@ -345,11 +344,11 @@ def Main_vbjde_physio(graph, Y, Onsets, durations, Thrf, K, TR, beta, dt,
         # Variance HRF: sigmaH
         if estimateSigmaH:
             logger.info("M sigma_H step ...")
-            #sigmaH = vt.maximization_sigma_asl(D, Sigma_H, matrix_covH, AuxH, use_hyperprior, gamma_h)
-            if use_hyperprior:
-                sigmaH = vt.maximization_sigmaH_prior(D, Sigma_H, R_inv, H, gamma_h)
-            else:
-                sigmaH = vt.maximization_sigmaH(D, Sigma_H, R_inv, H)
+            sigmaH = vt.maximization_sigma_asl(D, Sigma_H, matrix_covH, AuxH, use_hyperprior, gamma_h)
+            #if use_hyperprior:
+            #    sigmaH = vt.maximization_sigmaH_prior(D, Sigma_H, R_inv, H, gamma_h)
+            #else:
+            #    sigmaH = vt.maximization_sigmaH(D, Sigma_H, R_inv, H)
             logger.info('sigmaH = ' + str(sigmaH))
 
         if ni > 0:
@@ -413,8 +412,8 @@ def Main_vbjde_physio(graph, Y, Onsets, durations, Thrf, K, TR, beta, dt,
         if estimateNoise:
             logger.info("M sigma noise step ...")
             for s in xrange(n_sess):
-                #sigma_eps[s, :] = vt.maximization_sigma_noise_asl(XX[s, :, :, :], m_A[s, :, :], Sigma_A[:, :, :, s], H, m_C[s, :, :], Sigma_C[:, :, :, s], G, Sigma_H, Sigma_G, W, y_tilde[s, :, :], Gamma, Gamma_X[:, s, :, :], Gamma_WX[:, s, :, :], N)
-                sigma_eps[s, :] = vt.maximization_noise_var(XX[s, :, :, :], H, Sigma_H, m_A[s, :, :], Sigma_A[:, :, :, s], Gamma, y_tilde[s, :, :], N)
+                sigma_eps[s, :] = vt.maximization_sigma_noise_asl(XX[s, :, :, :], m_A[s, :, :], Sigma_A[:, :, :, s], H, m_C[s, :, :], Sigma_C[:, :, :, s], G, Sigma_H, Sigma_G, W, y_tilde[s, :, :], Gamma, Gamma_X[:, s, :, :], Gamma_WX[:, s, :, :], N)
+                #sigma_eps[s, :] = vt.maximization_noise_var(XX[s, :, :, :], H, Sigma_H, m_A[s, :, :], Sigma_A[:, :, :, s], Gamma, y_tilde[s, :, :], N)
 
 
         if 0:
