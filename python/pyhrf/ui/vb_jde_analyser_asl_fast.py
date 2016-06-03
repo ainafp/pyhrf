@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 import pyhrf
 from pyhrf.ndarray import xndarray
-from pyhrf.vbjde.vem_asl_models_fast_ms import Main_vbjde_physio
+from pyhrf.vbjde.vem_asl_models_fast import Main_vbjde_physio
 from pyhrf.vbjde.vem_tools import roc_curve
 from pyhrf.xmlio import XmlInitable
 from pyhrf.tools import format_duration
@@ -152,16 +152,15 @@ class JDEVEMAnalyser(JDEAnalyser):
         # roiData.bold : numpy array of shape
         # BOLD has shape (nscans, nvoxels)
         # roiData.graph #list of neighbours
-        n_scan_allsession, nvox = roiData.bold.shape
-        n_scan = n_scan_allsession / self.n_session
-        data0 = roiData.bold.reshape(self.n_session, n_scan, nvox)
-        data = np.zeros_like(data0)
-        for s in xrange(self.n_session):
-            data_mean = np.mean(data0[s, :, :])
-            data_range = (np.max(data0[s, :, :]) - np.min(data0[s, :, :]))
-            data[s, :, :] = (data0[s, :, :] - data_mean) * 100 / data_range
-        Onsets = roiData.paradigm.get_joined_onsets_dim()
-        durations = roiData.paradigm.get_joined_durations_dim()
+        #n_scan_allsession, nvox = roiData.bold.shape
+        #n_scan = n_scan_allsession / self.n_session
+        #data = roiData.bold.reshape(self.n_session, n_scan, nvox)
+        #Onsets = roiData.paradigm.get_joined_onsets_dim()
+        #durations = roiData.paradigm.get_joined_durations_dim()
+        n_scan, nvox = roiData.bold.shape
+        data = roiData.bold
+        Onsets = roiData.paradigm.get_joined_onsets()
+        durations = roiData.paradigm.get_joined_durations()
         TR = roiData.tr
         # K = 2                      # number of classes
         beta = self.beta
@@ -194,6 +193,7 @@ class JDEVEMAnalyser(JDEAnalyser):
             noiseVar, mu_Ma, sigma_Ma, mu_Mc, sigma_Mc, Beta, L, PL, alpha,\
             Sigma_brls, Sigma_prls, Sigma_brf, Sigma_prf, rerror, \
             CONTRAST_A, CONTRASTVAR_A, CONTRAST_C, CONTRASTVAR_C, \
+            ppm_a_brl, ppm_g_brl, ppm_a_prl, ppm_g_prl, \
             cA, cH, cC, cG, cZ, cAH, cCG, cTime, FE = Main_vbjde_physio(
                                        graph, data, Onsets, durations,
                                        self.hrfDuration, self.nbClasses, TR,
@@ -222,7 +222,6 @@ class JDEVEMAnalyser(JDEAnalyser):
                                        phy_params=self.phy_params,
                                        prior = self.prior, zc=self.zc)
 
-
         # Plot analysis duration
         self.analysis_duration = time() - t_start
         logger.info('JDE VEM analysis took: %s',
@@ -235,54 +234,53 @@ class JDEVEMAnalyser(JDEAnalyser):
         outputs['brf'] = xndarray(estimated_brf, axes_names=['time'],
                                   axes_domains={'time': brf_time},
                                   value_label="BRF")
-        #logger.info("BRF prepared ")
         domCondition = {'condition': cNames}
         outputs['brls'] = xndarray(brls.T, value_label="BRLs",
                                    axes_names=['condition', 'voxel'],
                                    axes_domains=domCondition)
-        #logger.info("BRLs prepared ")
+        outputs['ppm_a_brl'] = xndarray(ppm_a_brl, value_label="PPM BRL alpha",
+                                   axes_names=["voxel", "condition"],
+                                   axes_domains=domCondition)
+        outputs['ppm_g_brl'] = xndarray(ppm_g_brl, value_label="PPM BRL gamma",
+                                   axes_names=["voxel", "condition"],
+                                   axes_domains=domCondition)
         prf_time = np.arange(len(estimated_prf)) * self.dt
         outputs['prf'] = xndarray(estimated_prf, axes_names=['time'],
                                   axes_domains={'time': prf_time},
                                   value_label="PRF")
-        #logger.info("PRF prepared ")
         outputs['prls'] = xndarray(prls.T, value_label="PRLs",
                                    axes_names=['condition', 'voxel'],
                                    axes_domains=domCondition)
-        #logger.info("PRLs prepared ")
+        outputs['ppm_a_prl'] = xndarray(ppm_a_brl, value_label="PPM PRL alpha",
+                                   axes_names=["voxel", "condition"],
+                                   axes_domains=domCondition)
+        outputs['ppm_g_prl'] = xndarray(ppm_g_brl, value_label="PPM PRL gamma",
+                                   axes_names=["voxel", "condition"],
+                                   axes_domains=domCondition)
 
         outputs['Sigma_brf'] = xndarray(Sigma_brf, value_label="Sigma_BRF")
-        #logger.info("Sigma_BRF prepared ")
         outputs['Sigma_prf'] = xndarray(Sigma_prf, value_label="Sigma_PRF")
-        #logger.info("Sigma_PRF prepared ")
-
         ad = {'condition': cNames, 'condition2': Onsets.keys()}
         outputs['Sigma_brls'] = xndarray(Sigma_brls, value_label="Sigma_BRLs",
                                          axes_names=['condition', 'condition2',
                                                      'voxel'],
                                          axes_domains=ad)
-        #logger.info("Sigma_a prepared ")
         outputs['Sigma_prls'] = xndarray(Sigma_prls, value_label="Sigma_PRLs",
                                          axes_names=['condition', 'condition2',
                                                      'voxel'],
                                          axes_domains=ad)
-        #logger.info("Sigma_c prepared ")
         outputs['NbIter'] = xndarray(np.array([NbIter]), value_label="NbIter")
         outputs['beta'] = xndarray(Beta, value_label="beta",
                                    axes_names=['condition'],
                                    axes_domains=domCondition)
-
-        #logger.info("perfusion baseline prepared ")
         outputs['alpha'] = xndarray(alpha, value_label="Perf_baseline",
                                           axes_names=['voxel'])
 
-        #logger.info("Beta prepared ")
         nbc, nbv = len(cNames), brls.shape[0]
         repeatedBeta = np.repeat(Beta, nbv).reshape(nbc, nbv)
         outputs['beta_mapped'] = xndarray(repeatedBeta, value_label="beta",
                                           axes_names=['condition', 'voxel'],
                                           axes_domains=domCondition)
-
         repeated_brf = np.repeat(estimated_brf, nbv).reshape(-1, nbv)
         outputs["brf_mapped"] = xndarray(repeated_brf, value_label="BRFs",
                                          axes_names=["time", "voxel"],
@@ -292,36 +290,31 @@ class JDEVEMAnalyser(JDEAnalyser):
         outputs["prf_mapped"] = xndarray(repeated_prf, value_label="PRFs",
                                          axes_names=["time", "voxel"],
                                          axes_domains={"time": prf_time})
-
-        #logger.info("beta mapped prepared ")
         outputs['roi_mask'] = xndarray(np.zeros(nbv) + roiData.get_roi_id(),
                                        value_label="ROI",
                                        axes_names=['voxel'])
 
-        #logger.info("ROI mask prepared ")
         mixtpB = np.zeros((roiData.nbConditions, self.nbClasses, 2))
         mixtpB[:, :, 0] = mu_Ma
-        mixtpB[:, :, 1] = sigma_Ma ** 2
+        mixtpB[:, :, 1] = np.sqrt(sigma_Ma)
         mixtpP = np.zeros((roiData.nbConditions, self.nbClasses, 2))
         mixtpP[:, :, 0] = mu_Mc
-        mixtpP[:, :, 1] = sigma_Mc ** 2
+        mixtpP[:, :, 1] = np.sqrt(sigma_Mc)
         an = ['condition', 'Act_class', 'component']
         ad = {'Act_class': ['inactiv', 'activ'],
               'condition': cNames,
               'component': ['mean', 'var']}
         outputs['mixt_pB'] = xndarray(mixtpB, axes_names=an, axes_domains=ad)
         outputs['mixt_pP'] = xndarray(mixtpP, axes_names=an, axes_domains=ad)
-        #logger.info("Mixture parameters prepared ")
+
         an = ['condition', 'Act_class', 'voxel']
         ad = {'Act_class': ['inactiv', 'activ'],
               'condition': cNames}
-        #logger.info("mixt params prepared ")
         outputs['labels'] = xndarray(labels, value_label="Labels",
                                      axes_names=an, axes_domains=ad)
-        #logger.info("labels prepared ")
         outputs['noiseVar'] = xndarray(noiseVar, value_label="noiseVar",
                                        axes_names=['voxel'])
-        #logger.info("noise variance prepared ")
+
         if self.estimateLA:
             outputs['drift_coeff'] = xndarray(L, value_label="Drift",
                                               axes_names=['coeff', 'voxel'])
@@ -355,6 +348,7 @@ class JDEVEMAnalyser(JDEAnalyser):
                                              value_label="Normalized Contrast C",
                                              axes_names=['voxel','contrast'],
                                              axes_domains=domContrast)
+
 
         #######################################################################
         # CONVERGENCE
@@ -402,14 +396,16 @@ class JDEVEMAnalyser(JDEAnalyser):
                                         axes_domains=ad,
                                         value_label='Conv_Criterion_C')
             outName = 'convergence_FE'
-            outputs[outName] = xndarray(FE, axes_names=axes_names,
+            c = np.zeros(self.nItMax)  # -.001 #
+            c[:len(FE)] = FE
+            outputs[outName] = xndarray(c, axes_names=axes_names,
                                         value_label='Conv_Criterion_FE')
-
             logger.info("Convergence saved ")
 
         #######################################################################
         # SIMULATION
         if self.simulation is not None:
+
             logger.info("Prepare parameters to compare if simulation")
             M = labels.shape[0]
             K = labels.shape[1]
@@ -490,8 +486,6 @@ class JDEVEMAnalyser(JDEAnalyser):
                                                 [self.analysis_duration]),
                                                 axes_names=['parcel_size'],
                                                 axes_domains=d)
-        """outputs['rerror'] = xndarray(np.array(  rerror),
-                                                axes_names=['parcel_size'])"""
         return outputs
 
 
